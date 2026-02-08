@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SD-WAN Webhook → SSE デモ</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <h2>SD-WAN Webhook → SSE デモ</h2>
+    <span id="sseStatus" class="pill ng">SSE: disconnected</span>
+    <div class="actions">
+      <button id="btnRefresh">更新（GET JSON）</button>
+      <button id="btnToggleSse">SSE 接続</button>
+    </div>
+  </header>
+
+  <p class="desc">
+    この画面は <code>Accept: */*</code>（通常のブラウザ）で <code>/v1/webhook/sdwan</code> にアクセスしたときに表示されます。<br/>
+    「更新」は同じURLへ <code>Accept: application/json</code> を付与して直近100件を取得します。<br/>
+    SSE は同じURLへ EventSource（<code>text/event-stream</code>）で接続し、Webhook 受信をリアルタイムに反映します。
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th class="col-id">ID</th>
+        <th class="col-time">受信時刻</th>
+        <th class="col-ip">送信元IP</th>
+        <th>Payload（JSON）</th>
+      </tr>
+    </thead>
+    <tbody id="tbody">
+      <tr><td colspan="4">読み込み中...</td></tr>
+    </tbody>
+  </table>
+
+  <script src="/static/app.js" defer></script>
+</body>
+</html>
