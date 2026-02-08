@@ -4,7 +4,25 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>SD-WAN Webhook → SSE デモ</title>
-  <link rel="stylesheet" href="/static/style.css" />
+  <style>
+body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", sans-serif; margin: 16px; }
+header { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+header h2 { margin:0; }
+.actions { display:flex; gap:8px; }
+button { padding: 8px 12px; cursor:pointer; }
+.pill { padding: 4px 10px; border-radius: 999px; background:#eee; font-size: 12px; }
+.ok { background: #d1fae5; }
+.ng { background: #fee2e2; }
+.desc { margin-top:10px; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: #f3f4f6; padding: 2px 6px; border-radius: 6px; }
+table { width:100%; border-collapse: collapse; margin-top: 12px; }
+th, td { border-bottom: 1px solid #ddd; padding: 8px; vertical-align: top; font-size: 13px; }
+th { text-align:left; background: #fafafa; position: sticky; top: 0; }
+pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.col-id { width: 80px; }
+.col-time { width: 180px; }
+.col-ip { width: 160px; }
+  </style>
 </head>
 <body>
   <header>
@@ -31,6 +49,74 @@
       <tr><td colspan="4">読み込み中...</td></tr>
     </tbody>
   </table>
-  <script src="/static/app.js" defer></script>
+  <script>
+(function(){ 
+  const endpoint = "/v1/webhooks/sdwan/";
+  const tbody = document.getElementById("tbody");
+  const sseStatus = document.getElementById("sseStatus");
+  const btnRefresh = document.getElementById("btnRefresh");
+  const btnToggleSse = document.getElementById("btnToggleSse");
+
+  let items = [];
+  let es = null;
+
+  function esc(s) {
+    return String(s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
+  }
+
+  function rowHtml(e) {
+    const payload = esc(JSON.stringify(e.body, null, 2));
+    return `      <tr>        <td><code>${esc(e.id)}</code></td>        <td><code>${esc(e.receivedAt)}</code></td>        <td><code>${esc(e.sourceIp)}</code></td>        <td><pre>${payload}</pre></td>      </tr>`;
+  }
+
+  function render() {
+    tbody.innerHTML = items.map(rowHtml).join("") || `<tr><td colspan="4">（まだデータがありません）</td></tr>`;
+  }
+
+  async function refresh() {
+    const r = await fetch(endpoint, { headers: { "Accept": "application/json" } });
+    const data = await r.json();
+    items = (data.items || []).slice().reverse();
+    render();
+  }
+
+  function setSseState(ok) {
+    sseStatus.textContent = ok ? "SSE: connected" : "SSE: disconnected";
+    sseStatus.className = "pill " + (ok ? "ok" : "ng");
+    btnToggleSse.textContent = ok ? "SSE 切断" : "SSE 接続";
+  }
+
+  function connectSse() {
+    es = new EventSource(endpoint);
+    es.addEventListener("open", () => setSseState(true));
+    es.addEventListener("snapshot", (ev) => {
+      const d = JSON.parse(ev.data);
+      items = (d.items || []).slice().reverse();
+      render();
+    });
+    es.addEventListener("alarm", (ev) => {
+      const d = JSON.parse(ev.data);
+      items.unshift(d);
+      items = items.slice(0,100);
+      render();
+    });
+    es.addEventListener("error", () => setSseState(false));
+  }
+
+  function disconnectSse() {
+    if (es) es.close();
+    es = null;
+    setSseState(false);
+  }
+
+  btnRefresh.addEventListener("click", () => refresh().catch(console.error));
+  btnToggleSse.addEventListener("click", () => {
+    if (es) disconnectSse();
+    else connectSse();
+  });
+
+  refresh().catch(console.error).finally(() => connectSse());
+})();
+  </script>
 </body>
 </html>
