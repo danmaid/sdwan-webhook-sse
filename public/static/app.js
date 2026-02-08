@@ -1,5 +1,5 @@
 (() => {
-  const endpoint = "/v1/webhook/sdwan";
+  const endpoint = "/v1/webhooks/sdwan/";
   const tbody = document.getElementById("tbody");
   const sseStatus = document.getElementById("sseStatus");
   const btnRefresh = document.getElementById("btnRefresh");
@@ -9,10 +9,7 @@
   let es = null;
 
   function esc(s) {
-    return String(s)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;");
+    return String(s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
   }
 
   function rowHtml(e) {
@@ -21,55 +18,37 @@
   }
 
   function render() {
-    const html = items.map(rowHtml).join("");
-    tbody.innerHTML = html || `<tr><td colspan="4">（まだデータがありません。vManage から Webhook を送ると表示されます）</td></tr>`;
+    tbody.innerHTML = items.map(rowHtml).join("") || `<tr><td colspan="4">（まだデータがありません）</td></tr>`;
   }
 
   async function refresh() {
-    const r = await fetch(endpoint, { headers: { "Accept": "application/json" }});
-    if (!r.ok) throw new Error("GET failed: " + r.status);
+    const r = await fetch(endpoint, { headers: { "Accept": "application/json" } });
     const data = await r.json();
-    // 新しい順で表示
     items = (data.items || []).slice().reverse();
     render();
   }
 
-  function setSseState(connected) {
-    sseStatus.textContent = connected ? "SSE: connected" : "SSE: disconnected";
-    sseStatus.className = "pill " + (connected ? "ok" : "ng");
-    btnToggleSse.textContent = connected ? "SSE 切断" : "SSE 接続";
+  function setSseState(ok) {
+    sseStatus.textContent = ok ? "SSE: connected" : "SSE: disconnected";
+    sseStatus.className = "pill " + (ok ? "ok" : "ng");
+    btnToggleSse.textContent = ok ? "SSE 切断" : "SSE 接続";
   }
 
   function connectSse() {
     es = new EventSource(endpoint);
-
     es.addEventListener("open", () => setSseState(true));
-
     es.addEventListener("snapshot", (ev) => {
-      try {
-        const data = JSON.parse(ev.data);
-        items = (data.items || []).slice().reverse();
-        render();
-      } catch (e) {
-        console.error("snapshot parse error", e);
-      }
+      const d = JSON.parse(ev.data);
+      items = (d.items || []).slice().reverse();
+      render();
     });
-
     es.addEventListener("alarm", (ev) => {
-      try {
-        const data = JSON.parse(ev.data);
-        items.unshift(data);
-        items = items.slice(0, 100);
-        render();
-      } catch (e) {
-        console.error("alarm parse error", e);
-      }
+      const d = JSON.parse(ev.data);
+      items.unshift(d);
+      items = items.slice(0,100);
+      render();
     });
-
-    es.addEventListener("error", () => {
-      // EventSource は自動再接続します
-      setSseState(false);
-    });
+    es.addEventListener("error", () => setSseState(false));
   }
 
   function disconnectSse() {
@@ -84,6 +63,5 @@
     else connectSse();
   });
 
-  // 初期：GET → SSE
   refresh().catch(console.error).finally(() => connectSse());
 })();
